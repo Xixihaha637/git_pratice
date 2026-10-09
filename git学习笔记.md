@@ -1,6 +1,8 @@
 # Git 学习笔记
 
 > 架构模型 + 实际操作。模型帮你"想通"，命令帮你"会做"。
+>
+> ⚠️ 本文的 Mermaid 图需要用 **Markdown Preview Enhanced（MPE）** 预览才能渲染：右键 → "Markdown Preview Enhanced: Open Preview to the Side"。VS Code 自带的 `Ctrl+K V` 预览不认 Mermaid。
 
 ---
 
@@ -8,11 +10,20 @@
 
 ### 1. 三区域模型 —— git 最核心的一张图
 
-```
-工作区(working)  --git add-->  暂存区(staging)  --git commit-->  版本库(repo/.git)
-  你正在编辑的文件         "待提交清单"                真正存档的历史
+```mermaid
+flowchart LR
+    W["工作区 working<br/>你正在编辑的文件"]
+    S["暂存区 staging<br/>待提交清单"]
+    R["版本库 repo (.git)<br/>真正存档的历史"]
+
+    W -->|"git add"| S
+    S -->|"git commit"| R
+    S -->|"git restore --staged<br/>(撤销暂存)"| W
+    W -.->|"git diff"| S
+    S -.->|"git diff --staged"| R
 ```
 
+- 实线箭头 = 数据的流转方向；虚线箭头 = `git diff` 比较的是哪两边。
 - **工作区**：磁盘上你能看到、编辑的文件。
 - **暂存区**：一次提交的"购物车"，你决定哪些改动进这次存档。
 - **版本库**：`.git` 目录，存所有历史提交（快照）。
@@ -40,20 +51,25 @@
 - `HEAD → 当前分支 → 某次提交`。
 - 切换分支 = 把工作区内容换成那个分支指向的快照。**同一个文件，多份内容，切换分支自动切换。**
 
-```
-* fc07d68 (main)         ← 分支标签指向提交
-* 92acedc
-* d5f334f                ← 从这里开分支就是"分叉点"
-* f658c5f
+```mermaid
+flowchart TD
+    HEAD["HEAD<br/>(当前指针)"] -->|"指向"| main["main 分支<br/>(一个指针)"]
+    main -->|"指向"| C["● fc07d68 分支1测试"]
+    C --> D["● 92acedc 3"]
+    D --> E["● d5f334f 第二次怎么一行"]
+    E --> F["● f658c5f 第一次测试"]
 ```
 
 - `git log --oneline --graph --all` 用 ASCII 画出这个树；**Git Graph 扩展**（`mhutchie.git-graph`）把它画成彩色图，右键能操作。
 
 ### 4. 远程协作模型
 
-```
-你的电脑(本地仓库)  --git push 上传-->  GitHub(远程仓库 origin)
-                   <--git pull 拉取--
+```mermaid
+flowchart LR
+    L["本地仓库<br/>你的电脑"]
+    O["远程仓库 origin<br/>GitHub(本质是裸仓库 --bare)"]
+    L -->|"git push 上传"| O
+    O -->|"git pull 拉取"| L
 ```
 
 - **远程仓库**：另一处存的同一份历史。GitHub 服务器上的仓库本质是**裸仓库**（`--bare`：只有 `.git`，没有工作区）。
@@ -221,3 +237,115 @@ git check-ignore -v <文件>      # 查是哪条规则在忽略
 9. **提交信息规范**：用祈使句说清"做了什么"，如「添加第二行示例」，而不是「第二次怎么一行」。
 10. **真实仓库 vs 练习场要分清**：学 git 在练习场（`git_pratice`），别在 xarm_ros2 这类真机上乱试 `reset --hard` / `push`。
 11. **文件夹名带 `-master` 后缀** = GitHub "Download ZIP" 解压来的（不是 clone，clone 会有 `.git`）。
+
+---
+
+## 第四部分：一图看懂 + UI 对照 + 基本套路
+
+### 1. 三张结构图（Mermaid 版）
+
+**图 1：三区域模型（数据流转）**
+
+```mermaid
+flowchart LR
+    W["工作区 working<br/>你编辑的文件"]
+    S["暂存区 staging<br/>待提交清单"]
+    R["版本库 repo (.git)<br/>真正的存档"]
+
+    W -->|"git add"| S
+    S -->|"git commit"| R
+    S -->|"git restore --staged<br/>撤销暂存(改动回工作区)"| W
+    W -.->|"git diff"| S
+    S -.->|"git diff --staged"| R
+```
+
+**图 2：分支模型（分支 + 合并，gitGraph 渲染成真实 git 历史图）**
+
+```mermaid
+gitGraph
+    commit id: "f658c5f 第一次测试"
+    commit id: "d5f334f 第二次怎么一行"
+    branch feature
+    commit id: "分支提交 A"
+    commit id: "分支提交 B"
+    checkout main
+    commit id: "主线提交 C"
+    merge feature tag: "合并 feature"
+```
+
+- 两条彩色横线 = 两条分支；分叉点 = 开分支处，汇合点 = merge。
+- `git switch -c 新分支 <某提交>` = 从那个提交处"拉出"一条新线，与主线互不影响。
+
+**图 3：远程协作模型（数据流向）**
+
+```mermaid
+flowchart LR
+    L["本地仓库<br/>git_pratice<br/>(你的电脑)"]
+    O["远程仓库 origin<br/>GitHub / 裸仓库 (--bare)"]
+    C["同事的电脑<br/>(另一份 clone)"]
+
+    L -->|"git push (上传)"| O
+    O -->|"git pull (拉取)"| L
+    O -->|"git clone (整份复制)"| C
+    C -->|"git push"| O
+```
+
+### 2. UI 界面 ↔ 终端指令对照表
+
+| 🖱️ VS Code 界面 | ⌨️ 等价终端命令 |
+|---|---|
+| 「源代码管理」面板的**更改列表** | `git status` |
+| 文件旁 **U / M / D** 徽章 | 未跟踪 / 已修改 / 已删除 |
+| 点文件名（打开并排 diff） | `git diff` |
+| 悬停文件 → **＋** | `git add <文件>` |
+| 「更改」标题行悬停 → **＋** | `git add -A` |
+| 「暂存的更改」里悬停 → **−** | `git restore --staged <文件>` |
+| 悬停文件 → **↩**（放弃更改） | `git restore <文件>` |
+| 顶部「消息」框 + **Ctrl+Enter** | `git commit -m "..."` |
+| 提交按钮 **▾** → 提交并推送 | `git commit && git push` |
+| 「图表」区 | `git log --oneline --graph --all` |
+| **左下角状态栏分支名**（点它） | `git switch` / `git switch -c` |
+| 面板右上 **⋯** → 拉取 / 推送 | `git pull` / `git push` |
+| `Ctrl+Shift+P` → Git: 创建分支… | `git switch -c <名字>` |
+| 图表里右键提交 → 还原/重置/签出 | `git revert` / `git reset` / `git switch --detach` |
+
+**两条铁律**：① UI 每个按钮 = 一条命令，同一个 `.git`，两边实时同步；② 图标（`+`/`−`/`↩`）鼠标悬停才出现。
+
+### 3. 四个基本套路（背下日常够用）
+
+**套路① 日常改代码（最频繁）**
+
+```bash
+改文件 → git status → git diff → git add → git commit -m "..." → git push
+```
+
+**套路② 开新功能（分支工作流，进公司必用）**
+
+```bash
+git switch -c feature/xxx      # 1. 从 main 开新分支
+# …… 改代码，多次 commit ……     # 2. 在分支上随便折腾
+git switch main                # 3. 回到主线
+git merge feature/xxx          # 4. 合并成果
+git branch -d feature/xxx      # 5. 删掉用完的分支
+git push                       # 6. 推上去
+```
+
+**套路③ 多人协作（每天开工/收工）**
+
+```bash
+git pull           # 开工先拉最新
+# …… 干活、commit ……
+git pull           # 推之前再拉一次（提前发现冲突）
+git push           # 推上去
+```
+
+**套路④ 改坏了怎么办（按"改到哪一步"分）**
+
+```mermaid
+flowchart TD
+    Q{"改到哪一步了？"}
+    Q -->|"还没 add"| A["git restore <文件>"]
+    Q -->|"已经 add"| B["git restore --staged <文件><br/>再 git restore <文件>"]
+    Q -->|"已 commit 没 push"| C["git reset --soft HEAD~1"]
+    Q -->|"已经 push"| D["git revert <哈希>"]
+```
